@@ -36,7 +36,7 @@ http://127.0.0.1:5000
 1. Stand in front of webcam.
 2. In the browser, type the person name in the register box.
 3. Click Register Face.
-4. App captures multiple live samples and trains automatically.
+4. App captures one live face sample and trains automatically.
 
 No folder upload is required.
 
@@ -67,8 +67,8 @@ The browser page also has a Download CSV button.
 
 ```text
 face recognition/
-|- face_recognition_app.py
 |- web_app.py
+|- run.bat
 |- SETUP_GUIDE.md
 |- templates/
 |  |- index.html

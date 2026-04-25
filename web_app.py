@@ -13,7 +13,7 @@ MODEL_FILE = "trainer.yml"
 LABELS_FILE = "labels.json"
 DATASET_DIR = "dataset"
 FACE_SIZE = (200, 200)
-SAMPLES_PER_PERSON = 15
+SAMPLES_PER_PERSON = 1
 UNKNOWN_THRESHOLD = 85.0
 
 app = Flask(__name__)
@@ -207,6 +207,11 @@ def capture_samples(person_name):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         faces = detect_faces(detector, gray)
         if len(faces) == 0:
+            camera_state["last_event"] = "No face detected. Please face the camera"
+            continue
+
+        if len(faces) > 1:
+            camera_state["last_event"] = "Multiple faces detected. Only one face is allowed"
             continue
 
         largest = max(faces, key=lambda r: r[2] * r[3])
@@ -216,16 +221,19 @@ def capture_samples(person_name):
         captured += 1
 
     labels, trained = train_model(recognizer)
-    
+
     # Mark attendance immediately after successful registration
     if trained:
         mark_attendance(person_name)
         camera_state["last_event"] = f"Registered {person_name} and marked attendance"
-    
+
     # Registration should always end with camera stop as requested.
     if was_running or (camera is not None and camera.isOpened()):
         stop_camera()
-        camera_state["last_event"] = f"Registered {person_name}. Camera stopped automatically"
+
+    if not trained:
+        camera_state["last_event"] = "Registration failed. Try again with one clear face"
+
     return trained, labels
 
 
@@ -253,6 +261,29 @@ def generate_frames():
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         faces = detect_faces(detector, gray)
+
+        if len(faces) > 1:
+            camera_state["last_event"] = "Multiple faces detected. Only one face is allowed"
+            for (x, y, w, h) in faces:
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
+            cv2.putText(
+                frame,
+                "Only one face allowed",
+                (10, 56),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.62,
+                (0, 0, 255),
+                2,
+            )
+            ret, buffer = cv2.imencode(".jpg", frame)
+            if not ret:
+                continue
+            frame_bytes = buffer.tobytes()
+            yield (
+                b"--frame\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
+            )
+            continue
 
         for rect in faces:
             x, y, w, h = rect
@@ -353,9 +384,7 @@ def register():
         camera_state["last_event"] = f"Registering {person_name}"
         trained, labels = capture_samples(person_name)
         if trained:
-            camera_state["last_event"] = f"Registered {person_name}"
             return redirect(url_for("index"))
-        camera_state["last_event"] = "Registration failed. Try again."
     return redirect(url_for("index"))
 
 
