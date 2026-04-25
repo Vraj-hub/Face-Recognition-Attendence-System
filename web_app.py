@@ -13,8 +13,8 @@ MODEL_FILE = "trainer.yml"
 LABELS_FILE = "labels.json"
 DATASET_DIR = "dataset"
 FACE_SIZE = (200, 200)
-SAMPLES_PER_PERSON = 1
-UNKNOWN_THRESHOLD = 65.0
+SAMPLES_PER_PERSON = 15
+UNKNOWN_THRESHOLD = 85.0
 
 app = Flask(__name__)
 video_lock = threading.Lock()
@@ -25,6 +25,10 @@ camera_state = {
     "last_event": "Camera is stopped",
 }
 session_marked_names = set()
+
+
+def normalize_name(name):
+    return " ".join(name.strip().split()).lower()
 
 
 def ensure_files_and_dirs():
@@ -68,29 +72,36 @@ def next_label_id(labels):
 
 
 def mark_attendance(name):
+    normalized_name = normalize_name(name)
     now = datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H:%M:%S")
 
-    if name in session_marked_names:
+    if normalized_name in session_marked_names:
         return False
 
     with open(ATTENDANCE_FILE, "r", newline="", encoding="utf-8") as file:
         reader = csv.reader(file)
         for row in reader:
-            if len(row) >= 2 and row[0] == name and row[1] == date_str:
-                session_marked_names.add(name)
+            if len(row) >= 2 and normalize_name(row[0]) == normalized_name and row[1] == date_str:
+                session_marked_names.add(normalized_name)
                 return False
 
     with open(ATTENDANCE_FILE, "a", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
         writer.writerow([name, date_str, time_str, "Present"])
-    session_marked_names.add(name)
+    session_marked_names.add(normalized_name)
     return True
 
 
 def detect_faces(detector, gray_frame):
-    return detector.detectMultiScale(gray_frame, scaleFactor=1.2, minNeighbors=5, minSize=(80, 80))
+    # Reduced minNeighbors and minSize to makes detection easier
+    return detector.detectMultiScale(
+        gray_frame, 
+        scaleFactor=1.1, 
+        minNeighbors=3, 
+        minSize=(30, 30)
+    )
 
 
 def preprocess_face(gray_frame, rect):
@@ -205,6 +216,12 @@ def capture_samples(person_name):
         captured += 1
 
     labels, trained = train_model(recognizer)
+    
+    # Mark attendance immediately after successful registration
+    if trained:
+        mark_attendance(person_name)
+        camera_state["last_event"] = f"Registered {person_name} and marked attendance"
+    
     # Registration should always end with camera stop as requested.
     if was_running or (camera is not None and camera.isOpened()):
         stop_camera()
@@ -356,4 +373,5 @@ def refresh():
 
 if __name__ == "__main__":
     ensure_files_and_dirs()
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    debug_mode = os.environ.get("APP_DEBUG", "0") == "1"
+    app.run(host="127.0.0.1", port=5000, debug=debug_mode, use_reloader=debug_mode)

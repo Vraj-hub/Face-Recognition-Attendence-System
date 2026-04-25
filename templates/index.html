@@ -207,7 +207,7 @@
 
         <div class="row">
           <form action="/camera/start" method="post" class="row" style="margin-top:0;">
-            <input type="hidden" name="auto_stop" value="0">
+            <input type="hidden" name="auto_stop" value="1">
             <button class="btn warn" type="submit" {% if camera_running %}disabled{% endif %}>Start Camera</button>
           </form>
           <form action="/camera/stop" method="post" class="row" style="margin-top:0;">
@@ -223,7 +223,7 @@
         </div>
 
         <div class="status">Status: {{ last_event }}</div>
-        <p class="note">Attendance mode supports multiple faces in one run, and each person is marked only once per day. Registration flow auto-stops camera after capture.</p>
+        <p class="note">Attendance mode auto-stops after the first successful attendance mark. Each person is marked only once per day.</p>
       </div>
 
       <div class="card">

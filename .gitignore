@@ -9,3 +9,9 @@ startup.err
 .DS_Store
 Thumbs.db
 .vscode/
+
+# Private data files
+dataset/
+attendance.csv
+trainer.yml
+labels.json
